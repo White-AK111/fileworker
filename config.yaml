@@ -1,0 +1,8 @@
+app:
+  sourcePath: "TestFiles"
+  countGoroutine: 1000
+  countRndCopyIter: 1000
+  sizeCopyBuffer: 1024
+  flagDelete: true
+  flagRandCopy: true
+  runInTest: false
