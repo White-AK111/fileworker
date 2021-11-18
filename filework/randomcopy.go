@@ -3,6 +3,7 @@ package filework
 import (
 	"fmt"
 	"github.com/White-AK111/fileworker/config"
+	"go.uber.org/zap"
 	"math/rand"
 	"os"
 	"sort"
@@ -16,24 +17,32 @@ func DoRandomCopyFiles(cfg *config.Config) error {
 
 	err := findAllFiles(cfg, &fInfo)
 	if err != nil {
-		cfg.App.ErrorLogger.Printf("error on find all files in source path: %s", err)
+		cfg.App.Logger.Error("Error on find all files in source path.",
+			zap.String("path", cfg.App.SourcePath),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	// sort files, files in root directory priority are considered like original
+	cfg.App.Logger.Debug("Sort files, files in root directory priority are considered like original.")
 	sort.Slice(fInfo.allFilesList, func(i, j int) bool {
 		return fInfo.allFilesList[i].Path < fInfo.allFilesList[j].Path
 	})
 
 	// sort directories, root directory is priority
+	cfg.App.Logger.Debug("Sort directories, root directory is priority.")
 	sort.Slice(fInfo.directoryList, func(i, j int) bool {
 		return fInfo.directoryList[i] < fInfo.directoryList[j]
 	})
 
 	// copy files
+	cfg.App.Logger.Debug("Copy files.")
 	err = copyFiles(cfg, &fInfo)
 	if err != nil {
-		cfg.App.ErrorLogger.Printf("error on copy files: %s", err)
+		cfg.App.Logger.Error("Error on copy files.",
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -68,16 +77,23 @@ func copyFiles(cfg *config.Config, fInfo *filesInfo) error {
 
 			// check exist file before copy
 			pathNewFile := fInfo.directoryList[rDir] + "/copy_" + fInfo.allFilesList[rFile].Name
+			cfg.App.Logger.With(zap.String("source", fInfo.allFilesList[rFile].Path), zap.String("destination", pathNewFile)).Debug("Start copy file.")
 			if _, err := os.Stat(pathNewFile); os.IsNotExist(err) {
 				source, err := os.Open(fInfo.allFilesList[rFile].Path)
 				if err != nil {
-					cfg.App.ErrorLogger.Printf("error on open file: %s\n", err)
+					cfg.App.Logger.Error("Error on open file.",
+						zap.String("file", fInfo.allFilesList[rFile].Path),
+						zap.Error(err),
+					)
 				}
 				defer fileClose(cfg, source)
 
 				destination, err := os.Create(pathNewFile)
 				if err != nil {
-					cfg.App.ErrorLogger.Printf("error on create file: %s\n", err)
+					cfg.App.Logger.Error("Error on create file.",
+						zap.String("file", pathNewFile),
+						zap.Error(err),
+					)
 				}
 				defer fileClose(cfg, destination)
 

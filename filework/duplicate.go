@@ -3,6 +3,7 @@ package filework
 import (
 	"fmt"
 	"github.com/White-AK111/fileworker/config"
+	"go.uber.org/zap"
 	"os"
 	"sort"
 	"strings"
@@ -15,16 +16,21 @@ func DoDuplicateFiles(cfg *config.Config) error {
 
 	err := findAllFiles(cfg, &fInfo)
 	if err != nil {
-		cfg.App.ErrorLogger.Printf("error on find all files in source path: %s", err)
+		cfg.App.Logger.Error("Error on find all files in source path.",
+			zap.String("path", cfg.App.SourcePath),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	// sort files, files in root directory priority are considered like original
+	cfg.App.Logger.Debug("Sort files, files in root directory priority are considered like original.")
 	sort.Slice(fInfo.allFilesList, func(i, j int) bool {
 		return fInfo.allFilesList[i].Path < fInfo.allFilesList[j].Path
 	})
 
 	// compare files
+	cfg.App.Logger.Debug("Compare files.")
 	for i, file := range fInfo.allFilesList {
 		if file.contains(fInfo.allFilesList, i) {
 			fmt.Printf("Duplicate file: %s	Original file: %s\n", file.Path, file.OriginalFile.Path)
@@ -40,21 +46,28 @@ func DoDuplicateFiles(cfg *config.Config) error {
 		if len(fInfo.duplicateFilesList) == 0 {
 			fmt.Println("No files for delete!")
 		} else {
+			cfg.App.Logger.Debug("Get confirm for delete from user.")
 			var confirm string
 			if !cfg.App.RunInTest {
 				for strings.ToUpper(confirm) != "Y" && strings.ToUpper(confirm) != "N" {
 					fmt.Print("Delete this duplicate files? (Y/N): ")
 					_, err = fmt.Fscan(os.Stdin, &confirm)
 					if err != nil {
-						cfg.App.ErrorLogger.Printf("error on get approval from console: %s\n", err)
+						cfg.App.Logger.Warn("Error on get approval to delete from console.",
+							zap.String("get value", confirm),
+							zap.Error(err),
+						)
 						return err
 					}
 				}
 			}
+			cfg.App.Logger.Debug("Delete duplicated files.")
 			if strings.ToUpper(confirm) == "Y" || cfg.App.RunInTest {
 				err = deleteFiles(cfg, &fInfo)
 				if err != nil {
-					cfg.App.ErrorLogger.Printf("error on delete files: %s\n", err)
+					cfg.App.Logger.Error("Error on delete files.",
+						zap.Error(err),
+					)
 					return err
 				}
 				fmt.Println("Files deleted!")
@@ -83,8 +96,12 @@ func deleteFiles(cfg *config.Config, fInfo *filesInfo) error {
 			// block while full
 			wp.semaphoreChan <- struct{}{}
 			wp.mu.Lock()
+			cfg.App.Logger.With(zap.String("file", file.Path)).Debug("Delete file.")
 			if err := os.Remove(file.Path); err != nil {
-				cfg.App.ErrorLogger.Printf("error on delete file %s: %s\n", file.Path, err)
+				cfg.App.Logger.Error("Error on delete file.",
+					zap.String("file", file.Path),
+					zap.Error(err),
+				)
 			}
 		}(file)
 	}
