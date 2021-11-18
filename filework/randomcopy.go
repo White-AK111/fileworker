@@ -2,7 +2,7 @@ package filework
 
 import (
 	"fmt"
-	"github.com/White-AK111/GB_Go_Level2/Lesson8/config"
+	"github.com/White-AK111/fileworker/config"
 	"math/rand"
 	"os"
 	"sort"

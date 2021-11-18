@@ -15,8 +15,8 @@
 package main
 
 import (
-	"github.com/White-AK111/GB_Go_Level2/Lesson8/config"
-	"github.com/White-AK111/GB_Go_Level2/Lesson8/filework"
+	"github.com/White-AK111/fileworker/config"
+	"github.com/White-AK111/fileworker/filework"
 	"log"
 )
 

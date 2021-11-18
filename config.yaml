@@ -4,5 +4,5 @@ app:
   countRndCopyIter: 1000
   sizeCopyBuffer: 1024
   flagDelete: true
-  flagRandCopy: true
+  flagRandCopy: false
   runInTest: false
