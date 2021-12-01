@@ -5,10 +5,13 @@ import (
 	"crypto/sha256"
 	"flag"
 	"github.com/kkyr/fig"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"hash"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
@@ -22,7 +25,8 @@ const (
 type Config struct {
 	App struct {
 		HashAlgorithm    hash.Hash   // hash algorithm for use, don't load from configuration file
-		ErrorLogger      *log.Logger // logger for use, don't load from configuration file
+		Logger           *zap.Logger // logger for use, don't load from configuration file
+		LogLevel         int         `fig:"logLevel" default:"0"`          // flag for log level (0-info, 1-warn, -1-debug, 2-error, 4-panic, 5-fatal)
 		SourcePath       string      `fig:"sourcePath" default:"."`        // source directory
 		CountGoroutine   int         `fig:"countGoroutine" default:"10"`   // count of goroutines
 		CountRndCopyIter int         `fig:"countRndCopyIter" default:"10"` // random count for create copy of files
@@ -30,6 +34,7 @@ type Config struct {
 		FlagDelete       bool        `fig:"flagDelete"`                    // flag for delete duplicate files
 		FlagRandCopy     bool        `fig:"flagRandCopy"`                  // flag fo random copy files
 		RunInTest        bool        `fig:"runInTest"`                     // flag for testing, don't get approval fo delete from user
+		DoPanic          bool        `fig:"doPanic"`                       // flag for testing, do panic
 	} `fig:"app"`
 }
 
@@ -42,7 +47,48 @@ func Init() (*Config, error) {
 		return nil, err
 	}
 
-	cfg.App.ErrorLogger = NewBuiltinLogger().logger
+	//Set log level
+	atomicLevel := zap.NewAtomicLevel()
+	switch cfg.App.LogLevel {
+	case 0:
+		{
+			atomicLevel.SetLevel(zap.InfoLevel)
+		}
+	case 1:
+		{
+			atomicLevel.SetLevel(zap.WarnLevel)
+		}
+	case -1:
+		{
+			atomicLevel.SetLevel(zap.DebugLevel)
+		}
+	case 2:
+		{
+			atomicLevel.SetLevel(zap.ErrorLevel)
+		}
+	case 4:
+		{
+			atomicLevel.SetLevel(zap.PanicLevel)
+		}
+	case 5:
+		{
+			atomicLevel.SetLevel(zap.FatalLevel)
+		}
+	}
+
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
+	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	encoderCfg.EncodeCaller = zapcore.ShortCallerEncoder
+
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderCfg),
+		zapcore.Lock(os.Stdout),
+		atomicLevel,
+	), zap.AddCaller())
+
+	cfg.App.Logger = logger
+
 	cfg.App.HashAlgorithm = sha256.New()
 
 	return &cfg, err
@@ -57,7 +103,10 @@ func (c *Config) InitFlags() error {
 	flag.Parse()
 
 	if err := c.setABSPath(); err != nil {
-		c.App.ErrorLogger.Fatalf("error on get ABS path from source path %q: %v\n", c.App.SourcePath, err)
+		c.App.Logger.Warn("Error on get ABS path from source path",
+			zap.String("path", c.App.SourcePath),
+			zap.Error(err),
+		)
 		return err
 	}
 

@@ -17,33 +17,51 @@ package main
 import (
 	"github.com/White-AK111/fileworker/config"
 	"github.com/White-AK111/fileworker/filework"
+	"go.uber.org/zap"
 	"log"
 )
 
 func main() {
 	// init configuration
+	log.Printf("Start load configuration.\n")
 	cfg, err := config.Init()
 	if err != nil {
-		log.Fatalf("error on load configration file: %s", err)
+		log.Fatalf("Error on load configration file: %s", err)
 	}
+	cfg.App.Logger.With(zap.String("configuration file", "config.yaml")).Info("Configuration file successfully load.")
+
+	// flushes buffer, if any
+	defer cfg.App.Logger.Sync()
 
 	// init flags
+	cfg.App.Logger.Info("Start init flags.")
 	err = cfg.InitFlags()
 	if err != nil {
-		log.Fatalf("error on initialize flags: %s", err)
+		cfg.App.Logger.Warn("Error on init flags",
+			zap.Error(err),
+		)
 	}
+	cfg.App.Logger.Info("Flags successfully init.")
 
 	// exec function for find and delete files
+	cfg.App.Logger.Info("Start find duplicated files.")
 	err = filework.DoDuplicateFiles(cfg)
 	if err != nil {
-		cfg.App.ErrorLogger.Fatalf("Error on duplicate files function: %s", err)
+		cfg.App.Logger.Fatal("Error on duplicate files function",
+			zap.Error(err),
+		)
 	}
+	cfg.App.Logger.Info("Successfully find duplicated files.")
 
 	// exec function for create random copy files
+	cfg.App.Logger.Info("Start create random copy files.")
 	if cfg.App.FlagRandCopy {
 		err = filework.DoRandomCopyFiles(cfg)
 		if err != nil {
-			cfg.App.ErrorLogger.Fatalf("Error on random copy files function: %s", err)
+			cfg.App.Logger.Fatal("Error on random copy files function",
+				zap.Error(err),
+			)
 		}
 	}
+	cfg.App.Logger.Info("Successfully create random copy files.")
 }

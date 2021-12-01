@@ -1,8 +1,9 @@
 package filework
 
 import (
-	"github.com/White-AK111/GB_Go_Level2/Lesson8/config"
+	"github.com/White-AK111/fileworker/config"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -155,7 +156,9 @@ func ExampleDoDuplicateFiles() {
 	// function delete find duplicate files in source directory and delete this if flag -rm use (or it's set in config file config.yaml)
 	err = DoDuplicateFiles(cfg)
 	if err != nil {
-		cfg.App.ErrorLogger.Fatalf("Error on duplicate files function: %s", err)
+		cfg.App.Logger.Fatal("Error on duplicate files function",
+			zap.Error(err),
+		)
 	}
 }
 
@@ -180,7 +183,9 @@ func ExampleDoRandomCopyFiles() {
 	if cfg.App.FlagRandCopy {
 		err = DoRandomCopyFiles(cfg)
 		if err != nil {
-			cfg.App.ErrorLogger.Fatalf("Error on random copy files function: %s", err)
+			cfg.App.Logger.Fatal("Error on random copy files function",
+				zap.Error(err),
+			)
 		}
 	}
 }
