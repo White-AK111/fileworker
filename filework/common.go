@@ -4,8 +4,10 @@
 package filework
 
 import (
+	"context"
 	"encoding/hex"
 	"github.com/White-AK111/fileworker/config"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"io"
 	"os"
@@ -50,12 +52,15 @@ type FileEntity struct {
 }
 
 // getHashOfFile method get hash of file, return error
-func (f *FileEntity) getHashOfFile(cfg *config.Config) error {
+func (f *FileEntity) getHashOfFile(cfg *config.Config, ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "getHashOfFile")
+	defer span.Finish()
+
 	file, err := os.Open(f.Path)
 	if err != nil {
 		return err
 	}
-	defer fileClose(cfg, file)
+	defer fileClose(cfg, file, ctx)
 	cfg.App.Logger.With(zap.String("file", f.Path)).Debug("Open file for get hash.")
 
 	cfg.App.HashAlgorithm.Reset()
@@ -93,23 +98,29 @@ func newFileEntity() *FileEntity {
 }
 
 // findAllFiles function find all files in source directory without directories, save files info in filesInfo struct, return error
-func findAllFiles(cfg *config.Config, fInfo *filesInfo) error {
+func findAllFiles(cfg *config.Config, fInfo *filesInfo, ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "findAllFiles")
+	defer span.Finish()
+
 	wp := newWorkerPool(cfg.App.CountGoroutine)
 	defer wp.wg.Wait()
 
 	wp.wg.Add(1)
-	lsFiles(cfg.App.SourcePath, cfg, wp, fInfo)
+	lsFiles(cfg.App.SourcePath, cfg, wp, fInfo, ctx)
 
 	return nil
 }
 
 // lsFiles recursive function for find files in all directories
-func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo) {
+func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo, ctx context.Context) {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "lsFiles")
+	defer span.Finish()
+
 	// block while full
 	wp.semaphoreChan <- struct{}{}
 
 	go func() {
-		defer catchRecover(cfg)
+		defer catchRecover(cfg, ctx)
 		defer func() {
 			wp.mu.Unlock()
 			// read to release a slot
@@ -127,7 +138,7 @@ func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo) {
 			)
 		}
 
-		defer fileClose(cfg, file)
+		defer fileClose(cfg, file, ctx)
 
 		// loads all children files into memory
 		files, err := file.Readdir(-1)
@@ -147,7 +158,7 @@ func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo) {
 				if cfg.App.DoPanic {
 					panic("Panic!")
 				}
-				go lsFiles(path, cfg, wp, fInfo)
+				go lsFiles(path, cfg, wp, fInfo, ctx)
 			} else {
 				cfg.App.Logger.With(zap.String("file", path)).Debug("Find file in directory.")
 				fe := newFileEntity()
@@ -155,7 +166,7 @@ func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo) {
 				fe.Path = path
 				fe.Create = f.ModTime()
 				// get hash of file
-				if err = fe.getHashOfFile(cfg); err != nil {
+				if err = fe.getHashOfFile(cfg, ctx); err != nil {
 					cfg.App.Logger.Error("Can't get hash of file",
 						zap.String("file", path),
 						zap.Error(err),
@@ -169,7 +180,10 @@ func lsFiles(dir string, cfg *config.Config, wp *workerPool, fInfo *filesInfo) {
 }
 
 // fileClose function for defer close file or directory
-func fileClose(cfg *config.Config, file *os.File) {
+func fileClose(cfg *config.Config, file *os.File, ctx context.Context) {
+	span, _ := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "fileClose")
+	defer span.Finish()
+
 	cfg.App.Logger.With(zap.String("path", file.Name())).Debug("Close file or directory.")
 	err := file.Close()
 	if err != nil {
@@ -181,7 +195,10 @@ func fileClose(cfg *config.Config, file *os.File) {
 }
 
 // byteCopy function for copy file by use buffer
-func byteCopy(cfg *config.Config, source *os.File, destination *os.File) error {
+func byteCopy(cfg *config.Config, source *os.File, destination *os.File, ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "byteCopy")
+	defer span.Finish()
+
 	cfg.App.Logger.With(zap.String("source", source.Name()), zap.String("destination", destination.Name())).Debug("Copy file.")
 	buf := make([]byte, cfg.App.SizeCopyBuffer)
 	for {
@@ -210,7 +227,10 @@ func byteCopy(cfg *config.Config, source *os.File, destination *os.File) error {
 }
 
 // catchRecover func for do recover in another functions
-func catchRecover(cfg *config.Config) {
+func catchRecover(cfg *config.Config, ctx context.Context) {
+	span, _ := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "catchRecover")
+	defer span.Finish()
+
 	if r := recover(); r != nil {
 		cfg.App.Logger.Panic("Catch panic!")
 	}

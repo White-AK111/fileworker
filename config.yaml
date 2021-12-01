@@ -6,5 +6,5 @@ app:
   flagDelete: true
   flagRandCopy: false
   runInTest: false
-  doPanic: true
+  doPanic: false
   logLevel: -1

@@ -1,8 +1,10 @@
 package filework
 
 import (
+	"context"
 	"fmt"
 	"github.com/White-AK111/fileworker/config"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"math/rand"
 	"os"
@@ -11,11 +13,14 @@ import (
 )
 
 // DoRandomCopyFiles function for create random cope of files, return error
-func DoRandomCopyFiles(cfg *config.Config) error {
+func DoRandomCopyFiles(cfg *config.Config, ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "deleteFiles")
+	defer span.Finish()
+
 	fInfo := filesInfo{}
 	fInfo.directoryList = append(fInfo.directoryList, cfg.App.SourcePath)
 
-	err := findAllFiles(cfg, &fInfo)
+	err := findAllFiles(cfg, &fInfo, ctx)
 	if err != nil {
 		cfg.App.Logger.Error("Error on find all files in source path.",
 			zap.String("path", cfg.App.SourcePath),
@@ -38,7 +43,7 @@ func DoRandomCopyFiles(cfg *config.Config) error {
 
 	// copy files
 	cfg.App.Logger.Debug("Copy files.")
-	err = copyFiles(cfg, &fInfo)
+	err = copyFiles(cfg, &fInfo, ctx)
 	if err != nil {
 		cfg.App.Logger.Error("Error on copy files.",
 			zap.Error(err),
@@ -53,7 +58,10 @@ func DoRandomCopyFiles(cfg *config.Config) error {
 }
 
 // copyFiles function for random copy files
-func copyFiles(cfg *config.Config, fInfo *filesInfo) error {
+func copyFiles(cfg *config.Config, fInfo *filesInfo, ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "copyFiles")
+	defer span.Finish()
+
 	wp := newWorkerPool(cfg.App.CountGoroutine)
 	rCount := rand.Intn(cfg.App.CountRndCopyIter)
 	defer wp.wg.Wait()
@@ -86,7 +94,7 @@ func copyFiles(cfg *config.Config, fInfo *filesInfo) error {
 						zap.Error(err),
 					)
 				}
-				defer fileClose(cfg, source)
+				defer fileClose(cfg, source, ctx)
 
 				destination, err := os.Create(pathNewFile)
 				if err != nil {
@@ -95,9 +103,9 @@ func copyFiles(cfg *config.Config, fInfo *filesInfo) error {
 						zap.Error(err),
 					)
 				}
-				defer fileClose(cfg, destination)
+				defer fileClose(cfg, destination, ctx)
 
-				_ = byteCopy(cfg, source, destination)
+				_ = byteCopy(cfg, source, destination, ctx)
 				fRand := fInfo.allFilesList[rFile]
 				fRand.OriginalFile = &fInfo.allFilesList[rFile]
 				fRand.Path = pathNewFile

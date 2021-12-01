@@ -4,14 +4,16 @@ package config
 import (
 	"crypto/sha256"
 	"flag"
-	"github.com/kkyr/fig"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"hash"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/kkyr/fig"
+	"github.com/opentracing/opentracing-go"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -24,17 +26,18 @@ const (
 // Config structure for all settings of application
 type Config struct {
 	App struct {
-		HashAlgorithm    hash.Hash   // hash algorithm for use, don't load from configuration file
-		Logger           *zap.Logger // logger for use, don't load from configuration file
-		LogLevel         int         `fig:"logLevel" default:"0"`          // flag for log level (0-info, 1-warn, -1-debug, 2-error, 4-panic, 5-fatal)
-		SourcePath       string      `fig:"sourcePath" default:"."`        // source directory
-		CountGoroutine   int         `fig:"countGoroutine" default:"10"`   // count of goroutines
-		CountRndCopyIter int         `fig:"countRndCopyIter" default:"10"` // random count for create copy of files
-		SizeCopyBuffer   int         `fig:"sizeCopyBuffer" default:"512"`  // copy buffer size
-		FlagDelete       bool        `fig:"flagDelete"`                    // flag for delete duplicate files
-		FlagRandCopy     bool        `fig:"flagRandCopy"`                  // flag fo random copy files
-		RunInTest        bool        `fig:"runInTest"`                     // flag for testing, don't get approval fo delete from user
-		DoPanic          bool        `fig:"doPanic"`                       // flag for testing, do panic
+		HashAlgorithm    hash.Hash          // hash algorithm for use, don't load from configuration file
+		Logger           *zap.Logger        // logger for use, don't load from configuration file
+		Tracer           opentracing.Tracer // tracer for use, don't load from configuration file
+		LogLevel         int                `fig:"logLevel" default:"0"`          // flag for log level (0-info, 1-warn, -1-debug, 2-error, 4-panic, 5-fatal)
+		SourcePath       string             `fig:"sourcePath" default:"."`        // source directory
+		CountGoroutine   int                `fig:"countGoroutine" default:"10"`   // count of goroutines
+		CountRndCopyIter int                `fig:"countRndCopyIter" default:"10"` // random count for create copy of files
+		SizeCopyBuffer   int                `fig:"sizeCopyBuffer" default:"512"`  // copy buffer size
+		FlagDelete       bool               `fig:"flagDelete"`                    // flag for delete duplicate files
+		FlagRandCopy     bool               `fig:"flagRandCopy"`                  // flag fo random copy files
+		RunInTest        bool               `fig:"runInTest"`                     // flag for testing, don't get approval fo delete from user
+		DoPanic          bool               `fig:"doPanic"`                       // flag for testing, do panic
 	} `fig:"app"`
 }
 

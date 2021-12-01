@@ -1,8 +1,10 @@
 package filework
 
 import (
+	"context"
 	"fmt"
 	"github.com/White-AK111/fileworker/config"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"os"
 	"sort"
@@ -10,11 +12,14 @@ import (
 )
 
 // DoDuplicateFiles function for find duplicate file in source directory files compares by hash, optionality user can delete all duplicate files, return error
-func DoDuplicateFiles(cfg *config.Config) error {
+func DoDuplicateFiles(cfg *config.Config, ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "DoDuplicateFiles")
+	defer span.Finish()
+
 	fInfo := filesInfo{}
 	fInfo.directoryList = append(fInfo.directoryList, cfg.App.SourcePath)
 
-	err := findAllFiles(cfg, &fInfo)
+	err := findAllFiles(cfg, &fInfo, ctx)
 	if err != nil {
 		cfg.App.Logger.Error("Error on find all files in source path.",
 			zap.String("path", cfg.App.SourcePath),
@@ -63,7 +68,7 @@ func DoDuplicateFiles(cfg *config.Config) error {
 			}
 			cfg.App.Logger.Debug("Delete duplicated files.")
 			if strings.ToUpper(confirm) == "Y" || cfg.App.RunInTest {
-				err = deleteFiles(cfg, &fInfo)
+				err = deleteFiles(cfg, &fInfo, ctx)
 				if err != nil {
 					cfg.App.Logger.Error("Error on delete files.",
 						zap.Error(err),
@@ -79,7 +84,10 @@ func DoDuplicateFiles(cfg *config.Config) error {
 }
 
 // deleteFiles function delete files, return error
-func deleteFiles(cfg *config.Config, fInfo *filesInfo) error {
+func deleteFiles(cfg *config.Config, fInfo *filesInfo, ctx context.Context) error {
+	span, _ := opentracing.StartSpanFromContextWithTracer(ctx, cfg.App.Tracer, "deleteFiles")
+	defer span.Finish()
+
 	wp := newWorkerPool(cfg.App.CountGoroutine)
 	defer wp.wg.Wait()
 

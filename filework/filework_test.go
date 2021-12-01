@@ -1,6 +1,7 @@
 package filework
 
 import (
+	"context"
 	"github.com/White-AK111/fileworker/config"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -22,7 +23,9 @@ func TestDoDuplicateFiles(t *testing.T) {
 
 	filesB, _ := ioutil.ReadDir(cfg.App.SourcePath)
 
-	err = DoDuplicateFiles(cfg)
+	ctx := context.Background()
+
+	err = DoDuplicateFiles(cfg, ctx)
 	if err != nil {
 		t.Fatalf("error on duplicate files function: %s", err)
 	}
@@ -46,7 +49,9 @@ func TestDoRandomCopyFiles(t *testing.T) {
 
 	filesB, _ := ioutil.ReadDir(cfg.App.SourcePath)
 
-	err = DoRandomCopyFiles(cfg)
+	ctx := context.Background()
+
+	err = DoRandomCopyFiles(cfg, ctx)
 	if err != nil {
 		t.Fatalf("error on random copy files function: %s", err)
 	}
@@ -68,8 +73,10 @@ func BenchmarkDoDuplicateFiles_1go(b *testing.B) {
 	cfg.App.RunInTest = true
 	cfg.App.CountGoroutine = 1
 
+	ctx := context.Background()
+
 	for i := 0; i < b.N; i++ {
-		if err := DoDuplicateFiles(cfg); err != nil {
+		if err := DoDuplicateFiles(cfg, ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -89,8 +96,10 @@ func BenchmarkDoRandomCopyFiles_1go(b *testing.B) {
 	cfg.App.CountGoroutine = 1
 	cfg.App.CountRndCopyIter = 1000
 
+	ctx := context.Background()
+
 	for i := 0; i < b.N; i++ {
-		if err := DoRandomCopyFiles(cfg); err != nil {
+		if err := DoRandomCopyFiles(cfg, ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -108,8 +117,10 @@ func BenchmarkDoDuplicateFiles_1000go(b *testing.B) {
 	cfg.App.RunInTest = true
 	cfg.App.CountGoroutine = 1000
 
+	ctx := context.Background()
+
 	for i := 0; i < b.N; i++ {
-		if err := DoDuplicateFiles(cfg); err != nil {
+		if err := DoDuplicateFiles(cfg, ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -129,8 +140,10 @@ func BenchmarkDoRandomCopyFiles_1000go(b *testing.B) {
 	cfg.App.CountGoroutine = 1000
 	cfg.App.CountRndCopyIter = 1000
 
+	ctx := context.Background()
+
 	for i := 0; i < b.N; i++ {
-		if err := DoRandomCopyFiles(cfg); err != nil {
+		if err := DoRandomCopyFiles(cfg, ctx); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -153,8 +166,10 @@ func ExampleDoDuplicateFiles() {
 		log.Fatalf("error on initialize flags: %s", err)
 	}
 
+	ctx := context.Background()
+
 	// function delete find duplicate files in source directory and delete this if flag -rm use (or it's set in config file config.yaml)
-	err = DoDuplicateFiles(cfg)
+	err = DoDuplicateFiles(cfg, ctx)
 	if err != nil {
 		cfg.App.Logger.Fatal("Error on duplicate files function",
 			zap.Error(err),
@@ -179,9 +194,11 @@ func ExampleDoRandomCopyFiles() {
 		log.Fatalf("error on initialize flags: %s", err)
 	}
 
+	ctx := context.Background()
+
 	// function delete random create files in source directory use flag -cp (or it's set in config file config.yaml)
 	if cfg.App.FlagRandCopy {
-		err = DoRandomCopyFiles(cfg)
+		err = DoRandomCopyFiles(cfg, ctx)
 		if err != nil {
 			cfg.App.Logger.Fatal("Error on random copy files function",
 				zap.Error(err),
