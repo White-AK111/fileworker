@@ -15,11 +15,32 @@
 package main
 
 import (
+	"context"
+	"io"
+	"log"
+
 	"github.com/White-AK111/fileworker/config"
 	"github.com/White-AK111/fileworker/filework"
+
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
-	"log"
+
+	jaeger "github.com/uber/jaeger-client-go/config"
 )
+
+type zapWrapper struct {
+	logger *zap.Logger
+}
+
+// Error logs a message at error priority
+func (w *zapWrapper) Error(msg string) {
+	w.logger.Error(msg)
+}
+
+// Infof logs a message at info priority
+func (w *zapWrapper) Infof(msg string, args ...interface{}) {
+	w.logger.Sugar().Infof(msg, args...)
+}
 
 func main() {
 	// init configuration
@@ -33,6 +54,14 @@ func main() {
 	// flushes buffer, if any
 	defer cfg.App.Logger.Sync()
 
+	// add tracer
+	tracer, closer := initJaeger("fileworker", cfg.App.Logger)
+	defer closer.Close()
+	cfg.App.Tracer = tracer
+
+	span, ctx := opentracing.StartSpanFromContextWithTracer(context.Background(), cfg.App.Tracer, "main")
+	defer span.Finish()
+
 	// init flags
 	cfg.App.Logger.Info("Start init flags.")
 	err = cfg.InitFlags()
@@ -45,7 +74,7 @@ func main() {
 
 	// exec function for find and delete files
 	cfg.App.Logger.Info("Start find duplicated files.")
-	err = filework.DoDuplicateFiles(cfg)
+	err = filework.DoDuplicateFiles(cfg, ctx)
 	if err != nil {
 		cfg.App.Logger.Fatal("Error on duplicate files function",
 			zap.Error(err),
@@ -56,7 +85,7 @@ func main() {
 	// exec function for create random copy files
 	cfg.App.Logger.Info("Start create random copy files.")
 	if cfg.App.FlagRandCopy {
-		err = filework.DoRandomCopyFiles(cfg)
+		err = filework.DoRandomCopyFiles(cfg, ctx)
 		if err != nil {
 			cfg.App.Logger.Fatal("Error on random copy files function",
 				zap.Error(err),
@@ -64,4 +93,26 @@ func main() {
 		}
 	}
 	cfg.App.Logger.Info("Successfully create random copy files.")
+}
+
+func initJaeger(service string, logger *zap.Logger) (opentracing.Tracer, io.Closer) {
+	cfg := &jaeger.Configuration{
+		ServiceName: service,
+		Sampler: &jaeger.SamplerConfig{
+			Type:  "const",
+			Param: 1,
+		},
+		Reporter: &jaeger.ReporterConfig{
+			LogSpans: true,
+		},
+	}
+
+	tracer, closer, err := cfg.NewTracer(jaeger.Logger(&zapWrapper{logger: logger}))
+	if err != nil {
+		logger.Fatal("ERROR: cannot init Jaeger",
+			zap.Error(err),
+		)
+	}
+
+	return tracer, closer
 }
